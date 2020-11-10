@@ -1,5 +1,5 @@
-aerich==0.3.3
-aiomysql==0.0.20
+# aerich==0.3.3
+# aiomysql==0.0.20
 aiosqlite==0.16.0
 bcrypt==3.2.0
 cffi==1.14.3
