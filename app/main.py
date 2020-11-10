@@ -9,47 +9,39 @@ from jose import JWTError, jwt
 
 from datetime import timedelta, datetime
 from .models import (
-            User, 
-            Genre, 
-            Movie, 
-            MovieGenre
-        )
+    User,
+    Genre,
+    Movie,
+    MovieGenre
+)
 
 
 SECRET_KEY = "944ca420b8c316cabcd1885e9de6849f2350d1d29fa9d4f38fd8de33d4a31246"
 ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# fake_users_db = {
-#     "johndoe": {
-#         "username": "johndoe",
-#         "full_name": "John Doe",
-#         "email": "johndoe@example.com",
-#         "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",
-#         "disabled": False,
-#     }
-# }
-
 app = FastAPI()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")  
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # Database
-register_tortoise(  
+register_tortoise(
     app,
-    # db_url='mysql://root:Swati@123@swati-Inspiron-7591:3306/imdb', 
     db_url='sqlite://data/db.sqlite3',
-    modules={'models': ['app.models']}, 
-    generate_schemas=True, 
-    add_exception_handlers=True 
+    modules={'models': ['app.models']},
+    generate_schemas=True,
+    add_exception_handlers=True
 )
 
 UserPydantic = pydantic_model_creator(User, name="User")
-UserIn_Pydantic = pydantic_model_creator(User,exclude_readonly=True ,name="UserIn")
+UserIn_Pydantic = pydantic_model_creator(
+    User, exclude_readonly=True, name="UserIn")
 GenrePydantic = pydantic_model_creator(Genre, name="Genre")
 MoviePydantic = pydantic_model_creator(Movie, name="Movie")
-MovieIn_Pydantic = pydantic_model_creator(Movie,exclude_readonly=True ,name="MovieIn")
+MovieIn_Pydantic = pydantic_model_creator(
+    Movie, exclude_readonly=True, name="MovieIn")
 MovieGenrePydantic = pydantic_model_creator(MovieGenre, name="MovieGenre")
+
 
 class Token(BaseModel):
     access_token: str
@@ -68,7 +60,7 @@ def get_password_hash(password):
     return pwd_context.hash(password)
 
 
-async def authenticate_user(username:str, password:str):
+async def authenticate_user(username: str, password: str):
     if username is not None:
         user = await User.get_or_none(username=username)
     if not user:
@@ -78,27 +70,16 @@ async def authenticate_user(username:str, password:str):
     return user
 
 
-def create_access_token(data:dict, expires_delta: Optional[timedelta] =None):
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({'exp':expire})
+    to_encode.update({'exp': expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, ALGORITHM)
     return encoded_jwt
 
-# def hash_password(password: str):
-#     return hashlib.sha224(password.encode('utf-8')).hexdigest()
-
-# def fake_decode_token(token):
-#     # This doesn't provide any security at all
-#     # Check the next version
-#     user = get_user(fake_users_db, token)
-#     return user
-
-# /login : get token access (put username and password in authorization (use postman > authorization tab > select basic auth)
-# /all_user : put "api_key" in header generated from  /login , output will be current authenticated user (in postman > header tab > )
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
@@ -126,11 +107,11 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
-######################################################################################################
 
 @app.get('/')
 async def ping():
     return {"ping": "pong"}
+
 
 @app.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
@@ -147,13 +128,14 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
+
 @app.get("/users/me")
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
 # @app.post('/register')
 # async def user_register(user:UserIn_Pydantic):
-#     user_obj = await User.create(**user.dict(exclude_unset=True)) # when inserting password to db, it should be hashed   
+#     user_obj = await User.create(**user.dict(exclude_unset=True)) # when inserting password to db, it should be hashed
 #     return await UserPydantic.from_tortoise_orm(user_obj)
 
 # @app.post("/user/")
@@ -167,30 +149,38 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
 #     user_dict =  await User.all().values()
 #     return user_dict
 
-# Movie endpoints 
+# Movie endpoints
+
+
 @app.get('/all_movies')
 async def browse_movies():
     return await MoviePydantic.from_queryset(Movie.all())
 
+
 @app.post('/add_movie')
-async def add_movie(author_id:int, genres:list, movie:MovieIn_Pydantic, auth:bool= Depends(get_current_active_user)):
-    movie_obj = await Movie.create(user_id=author_id,**movie.dict(exclude_unset=True))
-    for genre in genres:
-        await MovieGenre.create(movie_id=movie_obj.movie_id, genre_id=genre)
+async def add_movie(author_id: int, movie: MovieIn_Pydantic, auth: bool = Depends(get_current_active_user), genres: Optional[list] = None):
+    movie_obj = await Movie.create(user_id=author_id, **movie.dict(exclude_unset=True))
+    if len(genres) > 0:
+        for genre in genres:
+            await MovieGenre.create(movie_id=movie_obj.movie_id, genre_id=genre)
     return await MoviePydantic.from_tortoise_orm(movie_obj)
 
+
 @app.put('/update_movie/{movie_id}')
-async def update_movie(movie_id:int, movie:MovieIn_Pydantic, auth:bool= Depends(get_current_active_user)):
+async def update_movie(movie_id: int, movie: MovieIn_Pydantic, auth: bool = Depends(get_current_active_user)):
     await Movie.filter(movie_id=movie_id).update(**movie.dict(exclude_unset=True))
     return await MoviePydantic.from_queryset_single(Movie.get(movie_id=movie_id))
 
+
 @app.delete('/delete_movie/{movie_id}')
-async def delete_movie(movie_id:int, auth:bool= Depends(get_current_active_user)):
+async def delete_movie(movie_id: int, auth: bool = Depends(get_current_active_user)):
     status = await Movie.filter(movie_id=movie_id).delete()
     if not status:
-        raise HTTPException(status_code=404 ,detail=f'Movie id {movie_id} "not found')
+        raise HTTPException(
+            status_code=404, detail=f'Movie id {movie_id} "not found')
     return f'Movie id {movie_id} successfully deleted'
 
+
 @app.get('/search')
-async def search_movies(search_query:str):
+async def search_movies(search_query: str):
     return await MoviePydantic.from_queryset(Movie.filter(movie_name__icontains=search_query))
