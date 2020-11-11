@@ -1,17 +1,8 @@
-FROM python:3.7-slim-buster
+FROM python:3.8.6
 LABEL maintainer="Swati Modi"
-
-RUN apt-get update && apt-get install -y python3-dev build-essential
-
-RUN mkdir -p /usr/src/app
-RUN mkdir -p /usr/src/data
-WORKDIR /usr/src/app
-
-COPY requirements.txt .
-RUN pip3 install -r requirements.txt
-
+RUN mkdir -p /usr/src/imdb
+WORKDIR /usr/src/imdb
 COPY . .
-
-EXPOSE 5000
-
-CMD ["uvicorn", "--host", "0.0.0.0", "--port", "5000", "app.main:app"]
+RUN pip install -r requirements.txt
+EXPOSE 8000
+CMD uvicorn app.main:app --host 0.0.0.0 --port 8000
